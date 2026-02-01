@@ -1,0 +1,2480 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>百家樂 • 路盤版</title>
+<style>
+  :root {
+    --bg: #0a1f14;
+    --card: rgba(15, 40, 30, 0.7);
+    --glass: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.14);
+    --player: #00aaff;
+    --banker: #ff3366;
+    --tie: #00c853;
+    --text: #f0f0f5;
+    --text-light: #a0a0b5;
+    --glow-player: 0 0 16px #00aaff66;
+    --glow-banker: 0 0 16px #ff336666;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* 頂部固定資訊條 */
+  #topInfo {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--card);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 1.1rem;
+  }
+
+  #balanceDisplay {
+    color: #ffd700;
+    font-weight: bold;
+  }
+
+  #currentBetDisplay {
+    font-weight: 500;
+  }
+
+  #app {
+    display: flex;
+    height: calc(100vh - 60px);
+  }
+
+  #leftPanel {
+    width: 360px;
+    max-width: 38%;
+    padding: 16px;
+    background: var(--card);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+
+  #rightPanel {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  /* 玻璃質感按鈕 */
+  .glass-btn {
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 16px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+
+  .glass-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  .glass-btn:active {
+    transform: translateY(0);
+  }
+
+  /* 大型投注按鈕 */
+  .bet-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .bet-btn {
+    height: 64px;
+    font-size: 1.35rem;
+    font-weight: bold;
+    border-radius: 14px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+
+  .bet-btn.player {
+    background: linear-gradient(145deg, #0088ff, #00aaff);
+    box-shadow: var(--glow-player);
+  }
+
+  .bet-btn.banker {
+    background: linear-gradient(145deg, #ff1a5c, #ff3366);
+    box-shadow: var(--glow-banker);
+  }
+
+  .bet-btn.tie {
+    background: linear-gradient(145deg, #00c853, #2ecc71);
+  }
+
+  /* 路圖標題 */
+  .road-title {
+    color: var(--text-light);
+    font-size: 1.15rem;
+    margin: 16px 0 8px;
+    font-weight: 500;
+  }
+
+  .road-container {
+    background: rgba(0,0,0,0.25);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  /* 路點格子 - 放大到26px */
+  .cell {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    margin: 3px;
+    font-size: 13px;
+    line-height: 26px;
+    text-align: center;
+    position: relative;
+  }
+
+  .player   { background: var(--player);   box-shadow: var(--glow-player); }
+  .banker   { background: var(--banker);   box-shadow: var(--glow-banker); }
+  .tie      { background: #0d331a; border: 2px solid #00c853; }
+
+  .hollow {
+    background: transparent !important;
+    border: 2.5px solid;
+    border-radius: 6px;
+  }
+
+  .slash::after {
+    content: "/";
+    position: absolute;
+    top: 2px;
+    left: 8px;
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+  }
+
+
+  /* 卡牌 */
+  .card {
+    width: 54px;
+    height: 80px;
+    background: linear-gradient(135deg, #f0f0f0, #e0e0e0);
+    color: #111;
+    border-radius: 8px;
+    margin: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.7rem;
+    font-weight: bold;
+    transform: rotate(2deg);
+  }
+
+  .card:nth-child(2) { transform: rotate(-2deg); }
+
+  /* 輸入框統一樣式 */
+  input[type="number"] {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    color: white;
+    width: 100%;
+  }
+
+  /* 響應式 - 手機/窄螢幕 */
+  @media (max-width: 920px) {
+    #app {
+      flex-direction: column;
+      height: auto;
+    }
+    #leftPanel {
+      width: 100%;
+      max-width: 100%;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .bet-group {
+      grid-template-columns: 1fr;
+    }
+    .bet-btn {
+      height: 70px;
+      font-size: 1.4rem;
+    }
+  }
+
+  /* 強制修復派生路顏色 - 放在 CSS 最下面 */
+.cell.red {
+  background-color: #ff4d4d !important;      /* 鮮紅 */
+  border: 2px solid #ff4d4d !important;
+  color: white !important;
+  box-shadow: 0 0 8px #ff4d4d80 !important;
+}
+
+.cell.blue {
+  background-color: #1e90ff !important;      /* 亮藍 */
+  border: 2px solid #1e90ff !important;
+  color: white !important;
+  box-shadow: 0 0 8px #1e90ff80 !important;
+}
+
+/* 確保 hollow 時只改邊框，不影響背景 */
+.cell.hollow.red {
+  background: transparent !important;
+  border-color: #ff4d4d !important;
+}
+
+.cell.hollow.blue {
+  background: transparent !important;
+  border-color: #1e90ff !important;
+}
+
+/* 問路格子也套用相同顏色規則 */
+/* =========================
+   問路格子（最終標準版）
+   ========================= */
+
+/* =========================
+   問路格子（最終標準版 - 大眼也空心）
+   ========================= */
+
+.askCell {
+  width: 34px;
+  height: 34px;
+  margin: 0 8px;
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  background: rgba(40,40,40,0.4);
+  border: 2px solid #555;
+  box-sizing: border-box;
+}
+
+/* ===== 顏色 ===== */
+.askCell.red    { border-color: #ff4d4d; color: #ff4d4d; }
+.askCell.blue   { border-color: #1e90ff; color: #1e90ff; }
+
+/* ===== 大眼路：強制空心圓 ===== */
+.askCell.eye {
+  background: transparent !important;
+  border-width: 3px !important;
+  border-style: solid !important;
+}
+
+.askCell.eye.red  { border-color: #ff4d4d !important; }
+.askCell.eye.blue { border-color: #1e90ff !important; }
+
+/* ===== 小路：實心圓 ===== */
+.askCell.small.red { 
+  background-color: #ff4d4d !important; 
+  border-color: #ff4d4d !important; 
+}
+
+.askCell.small.blue { 
+  background-color: #1e90ff !important; 
+  border-color: #1e90ff !important; 
+}
+/* ===== 曱甴路：空心 + 斜線 ===== */
+.askCell.cock {
+  background: transparent !important;
+  border-width: 3px !important;
+}
+
+.askCell.cock.red  { border-color: #ff4d4d !important; color: #ff4d4d !important; }
+.askCell.cock.blue { border-color: #1e90ff !important; color: #1e90ff !important; }
+
+.askCell.cock::after {
+  content: "/";
+  position: absolute;
+  top: 3px;
+  left: 11px;
+  font-size: 18px;
+  font-weight: 600;
+  color: currentColor;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* 防止互相污染 */
+.askCell.small.hollow { background: transparent !important; }
+/* =========================
+   正式曱甴路：空心圆 + 斜杠
+   ========================= */
+
+#cockroachRoad .cell {
+  background: transparent !important;   /* 🔥去掉实心 */
+  border-width: 3px;
+}
+
+#cockroachRoad .cell.red {
+  border-color: #ff4d4d !important;
+  color: #ff4d4d !important;
+}
+
+#cockroachRoad .cell.blue {
+  border-color: #1e90ff !important;
+  color: #1e90ff !important;
+}
+
+#cockroachRoad .cell.slash::after {
+  content: "/";
+  position: absolute;
+  top: 0px;
+  left: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: currentColor;
+  pointer-events: none;
+  color: currentColor !important;
+}
+
+.select-black {
+  color: #000;
+}
+
+/* 只針對大眼路容器內的 .cell 改成空心圓 */
+#bigEye .cell {
+  background: transparent !important;
+  border: 3px solid transparent !important;  /* 先設透明，避免顏色衝突 */
+  border-width: 3px !important;
+  border-style: solid !important;
+  border-radius: 50% !important;             /* 強制圓形 */
+  box-shadow: none !important;
+}
+
+/* 顏色應用到邊框 */
+#bigEye .cell.red {
+  border-color: #ff4d4d !important;
+  background: transparent !important;
+}
+
+#bigEye .cell.blue {
+  border-color: #1e90ff !important;
+  background: transparent !important;
+}
+/* 確保 hollow 類型也維持圓形空心 */
+#bigEye .cell.hollow {
+  background: transparent !important;
+  border-radius: 50% !important;
+}
+
+/* =========================
+   📱 实盘模式 · 手机 UI
+   ========================= */
+/* =========================
+   📱 实盘模式（带路图）
+   ========================= */
+
+.live-panel{
+  position: fixed;
+  inset: 0;
+  background: #0a1f14;
+  z-index: 9999;
+  display: none;
+  flex-direction: column;
+}
+
+/* ===== 路图区 ===== */
+.live-road-area{
+  padding: 10px;
+  border-bottom: 1px solid #333;
+}
+
+.live-road-area .road{
+  position: relative;
+  min-height: 160px;
+  margin-bottom: 8px;
+}
+
+.road-sub{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+/* ===== 输入区 ===== */
+.live-input-area{
+  padding: 14px;
+}
+
+.live-btn-group{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.live-btn{
+  height: 90px;
+  font-size: 32px;
+  font-weight: 800;
+  border-radius: 18px;
+  border: none;
+  color: white;
+}
+
+.live-btn.banker{
+  background:#ff3366;
+}
+.live-btn.player{
+  background:#1e90ff;
+}
+.live-btn.tie{
+  grid-column: span 2;
+  height: 70px;
+  background:#2ecc71;
+}
+
+/* ===== 建议区 ===== */
+.live-advice-area{
+  padding: 12px;
+}
+
+.live-advice{
+  height: 70px;
+  background:#111;
+  border-radius: 14px;
+  font-size: 26px;
+  font-weight: 700;
+  color:#ffd700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* ===== 底部 ===== */
+.live-footer{
+  margin-top:auto;
+  display:flex;
+  gap:10px;
+  padding:12px;
+}
+
+.live-footer button{
+  flex:1;
+  height:48px;
+  font-size:16px;
+  border-radius:12px;
+  border:none;
+  background:#333;
+  color:white;
+}
+order: none;
+}
+
+</style>
+</head>
+<body>
+
+
+
+<div id="topInfo">
+  
+<div style="margin:20px 0; display:flex; gap:12px;">
+      余额：<input id="balanceInput" type="number" value="1000">
+      <button class="glass-btn" onclick="setBalance()">确认</button>
+      <h2>余额：<span id="balance">1000</span></h2></div>
+    </div>
+
+  
+  <div id="currentBetDisplay">當前下注：<span id="currentBet">無</span></div>
+  <div id="resultText" style="color:#ffd700; font-weight:bold;"></div>
+</div>
+
+<div id="app">
+
+  <!-- 左側操作區 -->
+  <div id="leftPanel">
+<button class="glass-btn" onclick="enterLiveMode()">
+  📱 实盘模式
+</button>
+
+    <div class="bet-group">
+      <button class="bet-btn glass-btn player" onclick="bet('player')">押閒</button>
+      <button class="bet-btn glass-btn banker" onclick="bet('banker')">押莊</button>
+    </div>
+
+    <button class="bet-btn glass-btn tie" style="width:100%; margin:16px 0 8px;" onclick="bet('tie')">押和</button>
+    <button class="glass-btn" style="width:100%;" onclick="betSuper6()">押超級6</button>
+    <p style="margin:8px 0; color:#a0a0b5;">超級6下注：<span id="super6BetText">0</span></p>
+
+    <div style="margin:20px 0; display:flex; gap:12px;">
+      <input type="number" id="betAmountInput" value="100">
+      <button class="glass-btn" onclick="setBetAmount()">確認金額</button>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(90px,1fr)); gap:10px; margin:16px 0;">
+      <button class="glass-btn" onclick="quickBet(300)">300</button>
+      <button class="glass-btn" onclick="quickBet(500)">500</button>
+      <button class="glass-btn" onclick="quickBet(1000)">1000</button>
+      <button class="glass-btn" onclick="quickBet(3000)">3000</button>
+      <button class="glass-btn" onclick="allIn()">ALL IN</button>
+    </div>
+
+    <div style="margin:20px 0; display:flex; gap:12px;">
+      <button class="glass-btn" style="flex:1;" onclick="startRound()">發牌</button>
+      <button class="glass-btn" style="flex:1;" onclick="dealNoBet()">不下注發牌</button>
+    </div>
+
+    <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);">
+      <h3 style="color:var(--text-light); margin-bottom:12px;">下注統計</h3>
+      <div style="line-height:1.6;">
+        已下注：<span id="betCount">0</span>　局<br>
+        贏得　　：<span id="winCount">0</span>　局<br>
+        勝率　　：<span id="winRate">0%</span>
+      </div>
+    </div>
+
+  
+
+    <h3 style="margin-top:20px;">回测设置</h3>
+
+    <select class="glass-btn select-black" id="btWhen" >
+      
+      <option value="smallFollow" >小路顺</option>
+      <option value="bigEyeFollow">大眼顺</option>
+      <option value="reverse">反打</option>
+      <option value="bankerLowReverse">庄≤6赢 → 反打闲</option>
+
+    </select>
+
+    <select class="glass-btn select-black" id="btSizer">
+      <option value="martingale">100-300-600-1200</option>
+      <option value="flat">固定100</option>
+    </select>
+
+    <input id="btRounds" type="number" value="100" />
+
+    <button class="glass-btn" onclick="startBacktest()">开始回测</button>
+    <button class="glass-btn" style="width:100%; margin-top:24px; padding:14px;" onclick="runSuper6FollowSimulation(100000)">
+      超級6 → 跟押閒 回測 10萬局
+    </button>
+    <button class="glass-btn" style="width:100%; margin-top:8px;"
+        onclick="startPatternScoreBacktest()">
+  四路规律积分回测
+</button>
+  </div>
+
+  <!-- 右側路圖區 -->
+<div id="rightPanel">
+
+  <div class="road-title" id="shoeIndicator">當前：新一靴</div>
+
+  
+  <!-- 下一局參考 + 實際牌 放在同一行 -->
+<div style="margin: 16px 0 24px;">
+  <div class="road-title" style="margin-bottom: 12px;">下一局參考（問路）　　實際發牌結果</div>
+  
+  <div style="display: flex; align-items: flex-start; gap: 32px; flex-wrap: wrap;">
+    
+    <!-- 左邊：問路 -->
+    <div style="min-width: 220px;">
+      <div style="margin-bottom: 12px;">
+        莊　：<span id="askBankerEye"   class="askCell"></span>
+<span id="askBankerSmall" class="askCell"></span>
+<span id="askBankerCock"  class="askCell"></span>
+      </div>
+      <div>
+        閒　：<span id="askPlayerEye"   class="askCell"></span>
+<span id="askPlayerSmall" class="askCell"></span>
+<span id="askPlayerCock"  class="askCell"></span>
+      </div>
+    </div>
+
+    <!-- 右邊：實際牌（保持不變） -->
+    <div style="flex: 1; min-width: 320px;">
+      <div style="display: flex; justify-content: flex-start; gap: 40px; flex-wrap: wrap;">
+        <!-- 閒家牌 -->
+        <div>
+          <h4 style="margin: 0 0 8px 0; color: var(--player); text-align: center; font-weight: 500;">閒</h4>
+          <div id="playerCards" style="display: flex; gap: 10px; flex-wrap: nowrap;"></div>
+        </div>
+        <!-- 莊家牌 -->
+        <div>
+          <h4 style="margin: 0 0 8px 0; color: var(--banker); text-align: center; font-weight: 500;">莊</h4>
+          <div id="bankerCards" style="display: flex; gap: 10px; flex-wrap: nowrap;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+  <!-- 後面的大路開始照舊 -->
+  <div class="road-container">
+    <div class="road-title">大路</div>
+    <div id="bigRoad" class="road"></div>
+  </div>
+
+  <div class="road-container">
+    <div class="road-title">大眼</div>
+    <div id="bigEye" class="road"></div>
+  </div>
+
+  <div class="road-container">
+    <div class="road-title">小路</div>
+    <div id="smallRoad" class="road"></div>
+  </div>
+
+  <div class="road-container">
+    <div class="road-title">曱甴路</div>
+    <div id="cockroachRoad" class="road"></div>
+  </div>
+
+  <div class="road-container">
+    <div class="road-title">珠盤路</div>
+    <div id="beadRoad" style="display:flex; flex-wrap:wrap;"></div>
+  </div>
+
+</div>
+<!-- =========================
+     📱 实盘模式（带路图）
+     ========================= -->
+<div id="livePanel" class="live-panel">
+
+  <!-- 顶部：路图 -->
+  <div class="live-road-area">
+
+    <div class="road-title">大路</div>
+    <div id="liveBigRoad" class="road"></div>
+
+    <div class="road-sub">
+      <div>
+        <div class="road-title">大眼</div>
+        <div id="liveBigEye" class="road"></div>
+      </div>
+      <div>
+        <div class="road-title">小路</div>
+        <div id="liveSmallRoad" class="road"></div>
+      </div>
+      <div>
+        <div class="road-title">曱甴</div>
+        <div id="liveCockroachRoad" class="road"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 中部：输入 -->
+  <div class="live-input-area">
+
+    <div class="live-label">上一局结果</div>
+
+    <div class="live-btn-group">
+      <button class="live-btn banker" onclick="inputLive('banker')">庄</button>
+      <button class="live-btn player" onclick="inputLive('player')">闲</button>
+      <button class="live-btn tie" onclick="inputLive('tie')">和</button>
+    </div>
+
+  </div>
+
+  <!-- 建议 -->
+  <div class="live-advice-area">
+    <div class="live-label">下一局建议</div>
+    <div id="liveAdvice" class="live-advice">等待输入…</div>
+  </div>
+
+  <!-- 底部控制 -->
+  <div class="live-footer">
+    <button onclick="exitLiveMode()">⬅ 返回主页</button>
+    <button onclick="resetLiveMode()">🔄 清空路盘</button>
+  </div>
+
+</div>
+
+<!-- 你的原始 JavaScript 完整保留，不做任何刪減 -->
+<script>
+
+  
+// 以下全部為你原有的程式碼，一字未改
+let super6Bet = 0;   // 超级6下注金额
+
+let betCount = 0;   // 已下注盘数
+let winCount = 0;   // 赢的盘数
+
+  /* ===== 大路核心状态（你现在缺的）===== */
+
+const MAX_ROW = 6;     // 大路固定 6 行
+
+let bigMap = {};       // col -> row -> { res, tie }
+let bigCol = 0;
+let bigRow = 0;
+let lastResult = null;
+
+
+
+  // ===== 问路 DOM 绑定（你现在缺的就是这个）=====
+const askBankerEye   = document.getElementById("askBankerEye");
+const askBankerSmall = document.getElementById("askBankerSmall");
+const askBankerCock  = document.getElementById("askBankerCock");
+
+const askPlayerEye   = document.getElementById("askPlayerEye");
+const askPlayerSmall = document.getElementById("askPlayerSmall");
+const askPlayerCock  = document.getElementById("askPlayerCock");
+
+const super6BetText = document.getElementById("super6BetText");
+
+let autoBetState = {
+  running: false,
+
+  totalBet: 0,
+  win: 0,
+  lose: 0,
+  tie: 0,
+
+  curWinStreak: 0,
+  curLoseStreak: 0,
+  maxWinStreak: 0,
+  maxLoseStreak: 0,
+
+  lastBet: null   // "banker" | "player" | null
+};
+
+
+let bigEyeRoad = createRoad();
+let smallRoadR = createRoad();
+let cockroachRoadR = createRoad();
+
+const betCountEl = document.getElementById("betCount");
+const winCountEl = document.getElementById("winCount");
+const winRateEl  = document.getElementById("winRate");
+
+
+
+function setAskSmall(el, color) {
+  // 先清干净
+  el.className = "askCell small";
+
+  // 再加颜色
+  el.classList.add(color); // "red" 或 "blue"
+}
+
+function dealAndResolve(isBetting){
+
+  let p = [drawCard(), drawCard()];
+  let b = [drawCard(), drawCard()];
+
+  let pp = point(p);
+  let bp = point(b);
+
+  let pThird = null;
+
+  /* =========================
+     ✅ Step 1：例牌判断（8 / 9）
+     ========================= */
+  if(pp < 8 && bp < 8){
+
+    /* =========================
+       Step 2：闲家补牌
+       ========================= */
+    if(pp <= 5){
+      pThird = drawCard();
+      p.push(pThird);
+    }
+
+    /* =========================
+       Step 3：庄家补牌
+       ========================= */
+    if(pThird === null){
+      // 闲家未补牌
+      if(bp <= 5){
+        b.push(drawCard());
+      }
+    }else{
+      // 闲家补了第三张（按你给的表）
+      if(
+        bp <= 2 ||
+        (bp === 3 && pThird !== 8) ||
+        (bp === 4 && pThird >= 2 && pThird <= 7) ||
+        (bp === 5 && pThird >= 4 && pThird <= 7) ||
+        (bp === 6 && (pThird === 6 || pThird === 7))
+      ){
+        b.push(drawCard());
+      }
+    }
+  }
+
+  /* =========================
+     最终点数 & 显示
+     ========================= */
+  showCards("playerCards", p);
+  showCards("bankerCards", b);
+
+  pp = point(p);
+  bp = point(b);
+  lastBankerPoint = bp;
+
+  let res =
+    pp > bp ? "player" :
+    bp > pp ? "banker" :
+    "tie";
+
+  if(isBetting){
+  settle(res);
+}
+
+drawBead(res);
+drawBigRoad(res);
+nextRound();
+
+}
+function nextRound(){
+  super6Bet = 0;
+  autoBetState.lastBet = null;
+}
+
+
+function betSuper6(){
+  if(betAmt > balance){
+    alert("余额不足");
+    return;
+  }
+  super6Bet = betAmt;
+  super6BetText.innerText = super6Bet;
+}
+
+function updateBetStats(){
+  betCountEl.innerText = betCount;
+  winCountEl.innerText = winCount;
+
+  let rate = betCount === 0
+    ? 0
+    : ((winCount / betCount) * 100).toFixed(2);
+
+  winRateEl.innerText = rate + "%";
+}
+
+function createRoad(){
+  return {
+    map: {},
+    col: 0,
+    row: 0,
+    last: null
+  };
+}
+
+function roadStep(road, color){
+  // 第一手
+  if(road.last === null){
+    road.col = 0;
+    road.row = 0;
+  }
+  // 同色 → 尝试下落
+  else if(color === road.last){
+    if(
+      road.row + 1 < MAX_ROW &&
+      !road.map[road.col]?.[road.row + 1]
+    ){
+      road.row++;
+    }else{
+      // 顶住 → 右移
+      road.col++;
+    }
+  }
+  // 不同色 → 新列
+  else{
+    road.col++;
+    road.row = 0;
+  }
+
+  // 写入
+  road.map[road.col] ??= {};
+  road.map[road.col][road.row] = color;
+
+  road.last = color;
+}
+
+/* ====== Shoe（8 副牌 + 停牌卡） ====== */
+
+let shoe = [];
+let cutPosition = 0;   // 切牌卡位置（剩余多少张时触发）
+let dealtCount = 0;    // 已发张数
+
+function createShoe(){
+  shoe = [];
+  dealtCount = 0;
+
+  // 8 副完整牌（点数模型）
+  const oneDeck = [
+    1,2,3,4,5,6,7,8,9,
+    0,0,0,0,  // 10 J Q K
+    1,2,3,4,5,6,7,8,9,
+    0,0,0,0,
+    1,2,3,4,5,6,7,8,9,
+    0,0,0,0,
+    1,2,3,4,5,6,7,8,9,
+    0,0,0,0,  
+     // 共 5230006
+  ];
+
+  for(let i = 0; i < 8; i++){
+    shoe.push(...oneDeck);
+  }
+
+  // 洗牌
+  shoe.sort(() => Math.random() - 0.5);
+
+  // 🎯 切牌卡：65% ~ 80% 之间
+  const min = Math.floor(shoe.length * 0.85); // 
+  const max = Math.floor(shoe.length * 0.95); // 
+
+  cutPosition = Math.floor(
+    min + Math.random() * (max - min)
+  );
+
+  console.log(
+    `新一靴：总牌 ${shoe.length}，切牌卡在第 ${cutPosition} 张`
+  );
+}
+
+/* 抽一张牌，并判断是否触发停牌 */
+function drawFromShoe(){
+  let card = shoe.pop();
+  return card;
+}
+
+function getShoeProgress(){
+  return `${dealtCount} / ${cutPosition}`;
+}
+
+  /* ====== 下注金额 ====== */
+let betAmt = 100;
+
+function setBetAmount(){
+  let v = Number(betAmountInput.value);
+  if(v <= 0){
+    alert("下注金额必须大于 0");
+    return;
+  }
+  if(v > balance){
+    alert("下注金额不能大于余额");
+    return;
+  }
+  betAmt = v;
+  updateBetText();
+}
+
+function quickBet(v){
+  if(v > balance){
+    alert("余额不足");
+    return;
+  }
+  betAmt = v;
+  betAmountInput.value = v;
+  updateBetText();
+}
+
+function allIn(){
+  if(balance <= 0){
+    alert("没有余额");
+    return;
+  }
+  betAmt = balance;
+  betAmountInput.value = balance;
+  updateBetText();
+}
+
+function updateBetText(){
+  betAmountText.innerText = betAmt;
+}
+
+function getDerivedColor(offset, col, row){
+  if(col < offset + 1) return null;
+
+  let curHas = hasCell(col, row - 1);
+  let cmpHas = hasCell(col - offset, row - 1);
+
+  return (curHas === cmpHas) ? "red" : "blue";
+}
+
+/* ====== 判断大路某格是否存在 ====== */
+function hasCell(c, r){
+  return bigMap[c] && bigMap[c][r];
+}
+
+function renderRoad(road, container, slash = false, hollow = false) {
+  container.innerHTML = "";
+  
+  const cellSize = 26;     // 格子本體大小
+  const spacing = 3;       // 間距 → 總間距 29px
+  const step = cellSize + spacing;  // 29px
+
+  Object.keys(road.map).forEach(c => {
+    const col = Number(c);
+    Object.keys(road.map[c]).forEach(r => {
+      const row = Number(r);
+      let color = road.map[c][r];  // "red" 或 "blue"
+
+      let d = document.createElement("div");
+      d.className = `cell ${color}`
+        + (slash ? " slash" : "")
+        + (hollow ? " hollow" : "");
+
+      d.style.position = "absolute";
+      d.style.left = (col * step) + "px";
+      d.style.top  = (row * step) + "px";
+
+      container.appendChild(d);
+    });
+  });
+
+  container.style.position = "relative";
+  container.style.height = (MAX_ROW * step + 10) + "px";  // 多留一點空間
+  container.style.minHeight = "180px";
+  container.style.overflow = "visible";  // 避免格子被切掉
+}
+
+
+let lastBankerPoint = null;
+
+/* ====== 基础状态 ====== */
+let balance = 1000;
+let betType = null;
+
+
+/* ====== 路盘状态 ====== */
+let lastBig = null;
+let bigRoadData = [];
+let beadIndex = 0;
+
+/* ====== 牌堆 ====== */
+let deck = [];
+
+/* ====== UI ====== */
+function setBalance(){
+  balance = Number(balanceInput.value);
+  balanceSpan();
+}
+function balanceSpan(){
+  balanceSpanEl.innerText = balance;
+}
+const balanceSpanEl = document.getElementById("balance");
+
+/* ====== 下注 ====== */
+function bet(t){
+  betType = t;
+  currentBet.innerText = t;
+}
+
+/* ====== 牌逻辑 ====== */
+function createDeck(){
+  deck = [];
+  let base=[1,2,3,4,5,6,7,8,9,0,0,0,0];
+  for(let i=0;i<8;i++) base.forEach(c=>deck.push(c));
+  deck.sort(()=>Math.random()-0.5);
+}
+
+function point(a){ return a.reduce((x,y)=>x+y,0)%10; }
+
+function showCards(id,cards){
+  let el=document.getElementById(id);
+  el.innerHTML="";
+  cards.forEach(v=>{
+    let d=document.createElement("div");
+    d.className="card";
+    d.innerText=v;
+    el.appendChild(d);
+  });
+}
+
+function startRound(){
+  if(!betType){
+    alert("请先下注");
+    return;
+  }
+  dealAndResolve(true);   // ✅ 下注模式
+}
+
+function dealNoBet(){
+  dealAndResolve(false);  // ❌ 不结算、不统计
+}
+
+/* ====== 结算 ====== */
+function settle(res){
+  // ===== 本局一定是下注局 =====
+  betCount++;
+
+  let winThisRound = false;   // 是否赢主注 或 超级6
+
+  /* =====================
+     一、主注结算
+     ===================== */
+  if(res === "tie"){
+    if(betType === "tie"){
+      // 押和：1赔8
+      balance += betAmt * 8;
+      resultText.innerText = "和局，押和赢 ×8";
+      winThisRound = true;
+    }else{
+      // 押庄 / 押闲：退回本金（不输不赢）
+      resultText.innerText = "和局，退回本金";
+    }
+  }else{
+    if(betType === res){
+      balance += betAmt;
+      resultText.innerText = "赢：" + res;
+      winThisRound = true;
+    }else{
+      balance -= betAmt;
+      resultText.innerText = "输：" + res;
+    }
+  }
+
+  /* =====================
+     二、超级6结算（独立旁注）
+     ===================== */
+  if(super6Bet > 0){
+    if(res === "banker" && lastBankerPoint === 6){
+      // 超级6命中：1赔11
+      balance += super6Bet * 11;
+      resultText.innerText += " | 超级6 赢 ×11";
+      winThisRound = true;   // 算赢一局
+    }else{
+      balance -= super6Bet;
+    }
+
+    // 清空超级6下注
+    super6Bet = 0;
+    super6BetText.innerText = "0";
+  }
+
+  /* =====================
+     三、统计 & 收尾
+     ===================== */
+  if(winThisRound){
+    winCount++;
+  }
+
+  betType = null;
+  currentBet.innerText = "无";
+
+  balanceSpan();        // 刷新余额
+  updateBetStats();     // 刷新 胜率 / 赢盘 / 总盘
+}
+
+function drawBigRoad(res) {
+  // ===== 和局：只叠加，不推进 =====
+  if (res === "tie") {
+    if (bigMap[bigCol]?.[bigRow]) {
+      bigMap[bigCol][bigRow].tie++;
+    }
+    renderBigRoad();
+    renderAskRoad();
+    return;
+  }
+
+  // ===== 第一手 =====
+  if (lastResult === null) {
+    bigCol = 0;
+    bigRow = 0;
+  }
+
+  // ===== 同色（连庄 / 连闲）=====
+  else if (res === lastResult) {
+    // 情况 1：还没到第 6 行，向下
+    if (bigRow < MAX_ROW - 1) {
+      bigRow++;
+    }
+    // 情况 2：已经到第 6 行，向右横着走
+    else {
+      bigCol++;
+      // ❗ row 不变，仍然是第 6 行
+    }
+  }
+
+  // ===== 变色：新列，新起点 =====
+  else {
+    bigCol++;
+    bigRow = 0;
+  }
+
+  // ===== 写入数据 =====
+  bigMap[bigCol] ??= {};
+  bigMap[bigCol][bigRow] = {
+    res,
+    tie: 0,
+    point: lastBankerPoint
+  };
+
+  // ===== 派生路计算 =====
+  const eye   = calcBigEyeColor(bigCol, bigRow);
+  const small = calcSmallRoadColor(bigCol, bigRow);
+  const cock  = calcCockroachColor(bigCol, bigRow);
+
+  if (eye)   roadStep(bigEyeRoad, eye);
+  if (small) roadStep(smallRoadR, small);
+  if (cock)  roadStep(cockroachRoadR, cock);
+
+  lastResult = res;
+
+  renderBigRoad();
+  renderDerivedRoads();
+  renderAskRoad();
+}
+
+/* 渲染大路 */
+function renderBigRoad(){
+  bigRoad.innerHTML = "";
+  bigRoad.style.position = "relative";
+  bigRoad.style.height = (MAX_ROW * 24) + "px";
+
+  Object.keys(bigMap).forEach(c=>{
+    Object.keys(bigMap[c]).forEach(r=>{
+      const cell = bigMap[c][r];
+
+      const d = document.createElement("div");
+      d.className = "cell " + cell.res;
+      d.style.position = "absolute";
+      d.style.left = (c * 24) + "px";
+      d.style.top  = (r * 24) + "px";
+
+      if(cell.res === "banker" && cell.point === 6){
+  d.innerHTML = "<span class='super6'>6</span>";
+}
+
+if(cell.tie > 0){
+  d.innerHTML += "<div class='tieMark'>+" + cell.tie + "</div>";
+}
+
+
+      bigRoad.appendChild(d);
+    });
+  });
+}
+
+function dealOnceSim(deck){
+  let p=[deck.pop(),deck.pop()];
+  let b=[deck.pop(),deck.pop()];
+
+  let pp=point(p), bp=point(b);
+  let pThird=null;
+
+  if(pp<=5){ pThird=deck.pop(); p.push(pThird); }
+
+  if(pThird===null){
+    if(bp<=5) b.push(deck.pop());
+  }else{
+    if(
+      bp<=2 ||
+      (bp===3 && pThird!==8) ||
+      (bp===4 && pThird>=2 && pThird<=7) ||
+      (bp===5 && pThird>=4 && pThird<=7) ||
+      (bp===6 && (pThird===6 || pThird===7))
+    ) b.push(deck.pop());
+  }
+
+  pp=point(p); bp=point(b);
+  return pp>bp?"player":bp>pp?"banker":"tie";
+}
+
+function createSimState(){
+  return {
+    bigMap:{},
+    bigCol:0,
+    bigRow:0,
+    last:null,
+    bigEye:[],
+    small:[],
+    cockroach:[]
+  };
+}
+
+function simDrawBig(state,res){
+  if(res==="tie"){
+    if(state.bigMap[state.bigCol]?.[state.bigRow]){
+      state.bigMap[state.bigCol][state.bigRow].tie++;
+    }
+    return;
+  }
+
+  if(state.last===null){
+    state.bigCol=0; state.bigRow=0;
+  }else if(res===state.last){
+    if(
+      state.bigRow+1<6 &&
+      !state.bigMap[state.bigCol]?.[state.bigRow+1]
+    ){
+      state.bigRow++;
+    }else{
+      state.bigCol++;
+    }
+  }else{
+    state.bigCol++;
+    state.bigRow=0;
+  }
+
+  state.bigMap[state.bigCol] ??= {};
+  state.bigMap[state.bigCol][state.bigRow]={res,tie:0};
+
+  simDerived(state);
+  state.last=res;
+}
+
+function simHas(state,c,r){
+  return !!state.bigMap[c]?.[r];
+}
+
+function simDerived(state){
+  let c=state.bigCol, r=state.bigRow;
+  [
+    [state.bigEye,1],
+    [state.small,2],
+    [state.cockroach,3]
+  ].forEach(([arr,off])=>{
+    if(c>=off+1){
+      let cur=simHas(state,c,r-1);
+      let cmp=simHas(state,c-off,r-1);
+      arr.push(cur===cmp?"red":"blue");
+    }
+  });
+}
+
+function runSimulation(rounds){
+  let stat={
+    banker:0, player:0, tie:0,
+    maxBanker:0, maxPlayer:0
+  };
+
+  let state=createSimState();
+  let deck=[];
+
+  let curB=0, curP=0;
+
+  for(let i=0;i<rounds;i++){
+    if(deck.length<6){
+      deck=[];
+      let base=[1,2,3,4,5,6,7,8,9,0,0,0,0];
+      for(let d=0;d<8;d++) base.forEach(c=>deck.push(c));
+      deck.sort(()=>Math.random()-0.5);
+    }
+
+    let res=dealOnceSim(deck);
+
+    stat[res]++;
+
+    if(res==="banker"){
+      curB++; curP=0;
+      stat.maxBanker=Math.max(stat.maxBanker,curB);
+    }else if(res==="player"){
+      curP++; curB=0;
+      stat.maxPlayer=Math.max(stat.maxPlayer,curP);
+    }
+
+    simDrawBig(state,res);
+  }
+
+  let out=`
+总局数: ${rounds}
+
+庄: ${(stat.banker/rounds*100).toFixed(2)}%
+闲: ${(stat.player/rounds*100).toFixed(2)}%
+和: ${(stat.tie/rounds*100).toFixed(2)}%
+
+最大连庄: ${stat.maxBanker}
+最大连闲: ${stat.maxPlayer}
+
+大眼路 红/蓝: ${countRB(state.bigEye)}
+小路   红/蓝: ${countRB(state.small)}
+曱甴路 红/蓝: ${countRB(state.cockroach)}
+`;
+  simResult.textContent=out;
+}
+
+function countRB(arr){
+  let r=arr.filter(x=>x==="red").length;
+  let b=arr.filter(x=>x==="blue").length;
+  return `${r}/${b} (${(r/(r+b)*100).toFixed(2)}% red)`;
+}
+function startSimulation(){
+  let n = Number(simCountInput.value);
+
+  if(!Number.isInteger(n) || n <= 0){
+    alert("请输入大于 0 的整数");
+    return;
+  }
+
+  if(n > 5000){
+    alert("最多只能模拟 5000 局");
+    return;
+  }
+
+  simResult.textContent = "模拟中，请稍候...\n";
+  
+  // 给浏览器一个刷新机会（防假死）
+  setTimeout(()=>{
+    runSimulation(n);
+  }, 50);
+}
+
+function dealOnceSimWithDeck(){
+  // ===== 确保模拟用 deck 有足够牌 =====
+  if(deck.length < 6){
+    deck = [];
+    let base = [1,2,3,4,5,6,7,8,9,0,0,0,0];
+    for(let d = 0; d < 8; d++){
+      base.forEach(c => deck.push(c));
+    }
+    deck.sort(() => Math.random() - 0.5);
+  }
+
+  // ===== 发前两张 =====
+  let p = [deck.pop(), deck.pop()];
+  let b = [deck.pop(), deck.pop()];
+
+  let pp = point(p);
+  let bp = point(b);
+  let pThird = null;
+
+  /* ===== 例牌（8 / 9） ===== */
+  if(pp < 8 && bp < 8){
+
+    /* ===== 闲家补牌 ===== */
+    if(pp <= 5){
+      pThird = deck.pop();
+      p.push(pThird);
+    }
+
+    /* ===== 庄家补牌 ===== */
+    if(pThird === null){
+      if(bp <= 5){
+        b.push(deck.pop());
+      }
+    }else{
+      if(
+        bp <= 2 ||
+        (bp === 3 && pThird !== 8) ||
+        (bp === 4 && pThird >= 2 && pThird <= 7) ||
+        (bp === 5 && pThird >= 4 && pThird <= 7) ||
+        (bp === 6 && (pThird === 6 || pThird === 7))
+      ){
+        b.push(deck.pop());
+      }
+    }
+  }
+
+  // ===== 计算结果 =====
+  pp = point(p);
+  bp = point(b);
+
+  return pp > bp ? "player" : bp > pp ? "banker" : "tie";
+}
+
+
+let simRunning = false;
+let simRemain = 0;
+
+function startAutoSimulation(){
+  let n = Number(simCountInput.value);
+  if(n<=0 || n>5000){
+    alert("模拟局数 1 ~ 5000");
+    return;
+  }
+
+  simRemain = n;
+  simRunning = true;
+
+  createShoe();   // 新一轮 Shoe
+  autoStep();
+}
+
+function dealOnceSimWithShoe(){
+  let p = [drawCard(), drawCard()];
+  let b = [drawCard(), drawCard()];
+
+  let pp = point(p);
+  let bp = point(b);
+  let pThird = null;
+
+  if(pp < 8 && bp < 8){
+    if(pp <= 5){
+      pThird = drawCard();
+      p.push(pThird);
+    }
+
+    if(pThird === null){
+      if(bp <= 5){
+        b.push(drawCard());
+      }
+    }else{
+      if(
+        bp <= 2 ||
+        (bp === 3 && pThird !== 8) ||
+        (bp === 4 && pThird >= 2 && pThird <= 7) ||
+        (bp === 5 && pThird >= 4 && pThird <= 7) ||
+        (bp === 6 && (pThird === 6 || pThird === 7))
+      ){
+        b.push(drawCard());
+      }
+    }
+  }
+
+  pp = point(p);
+  bp = point(b);
+
+  return pp > bp ? "player" : bp > pp ? "banker" : "tie";
+}
+
+
+function autoStep(){
+  if(!autoBetState.running) return;
+
+  // 到切牌卡 → 换靴 & 清空路
+  
+
+  // ===== 1️⃣ 决定是否下注 =====
+  const betSide = decideAutoBet(); // "banker" | "player" | null
+  autoBetState.lastBet = betSide;
+
+  // ===== 2️⃣ 发一局牌 =====
+  const res = dealOnceSimWithShoe();
+
+  // ===== 3️⃣ 画路（非常重要）=====
+  drawBead(res);
+  drawBigRoad(res);
+
+  // ===== 4️⃣ 结算（如果有下注）=====
+  if(betSide){
+    autoBetState.totalBet++;
+
+    if(res === betSide){
+      autoBetState.win++;
+      autoBetState.curWinStreak++;
+      autoBetState.curLoseStreak = 0;
+      autoBetState.maxWinStreak = Math.max(
+        autoBetState.maxWinStreak,
+        autoBetState.curWinStreak
+      );
+    }
+    else if(res === "tie"){
+      autoBetState.tie++;
+      autoBetState.curWinStreak = 0;
+      autoBetState.curLoseStreak = 0;
+    }
+    else{
+      autoBetState.lose++;
+      autoBetState.curLoseStreak++;
+      autoBetState.curWinStreak = 0;
+      autoBetState.maxLoseStreak = Math.max(
+        autoBetState.maxLoseStreak,
+        autoBetState.curLoseStreak
+      );
+    }
+  }
+
+  // ===== 5️⃣ 继续 =====
+  setTimeout(autoStep, 20); // 回测速度
+}
+
+function startAutoBetSimulation(){
+  autoBetState.running = true;
+
+  autoBetState.totalBet = 0;
+  autoBetState.win = 0;
+  autoBetState.lose = 0;
+  autoBetState.tie = 0;
+  autoBetState.curWinStreak = 0;
+  autoBetState.curLoseStreak = 0;
+  autoBetState.maxWinStreak = 0;
+  autoBetState.maxLoseStreak = 0;
+  autoBetState.lastBet = null;
+
+  resetRoads();
+  createShoe();
+
+  autoStep();
+}
+
+function printAutoBetResult(){
+  const effective = autoBetState.win + autoBetState.lose;
+  const rate = effective === 0
+    ? 0
+    : ((autoBetState.win / effective) * 100).toFixed(2);
+
+  console.log("====== 问路自动下注回测 ======");
+  console.log("总下注局数:", autoBetState.totalBet);
+  console.log("赢:", autoBetState.win);
+  console.log("输:", autoBetState.lose);
+  console.log("和:", autoBetState.tie);
+  console.log("胜率:", rate + "%");
+  console.log("最大连胜:", autoBetState.maxWinStreak);
+  console.log("最大连输:", autoBetState.maxLoseStreak);
+}
+
+
+function stopAutoBetSimulation(){
+  autoBetState.running = false;
+  printAutoBetResult();
+}
+
+
+function stopAutoSimulation(){
+  simRunning = false;
+}
+
+function resetRoads(){
+  beadRoad.innerHTML = "";
+
+  bigMap = {};
+  bigCol = 0;
+  bigRow = 0;
+  lastResult = null;
+  bigRoad.innerHTML = "";
+
+  bigEyeRoad = createRoad();
+  smallRoadR = createRoad();
+  cockroachRoadR = createRoad();
+
+  bigEye.innerHTML = "";
+  smallRoad.innerHTML = "";
+  cockroachRoad.innerHTML = "";
+
+  renderDerivedRoads();
+}
+
+
+function simulateBigStep(state, res){
+  let { map, col, row, last } = JSON.parse(JSON.stringify(state));
+
+  if(last === null){
+    col = 0;
+    row = 0;
+  }
+  else if(res === last){
+    if(
+      row + 1 < MAX_ROW &&
+      !map[col]?.[row + 1]
+    ){
+      row++;
+    }else{
+      col++;
+    }
+  }
+  else{
+    col++;
+    row = 0;
+  }
+
+  map[col] ??= {};
+  map[col][row] = { res, tie: 0 };
+
+  return { map, col, row, last: res };
+}
+
+function askRoad(nextRes){
+  if(nextRes !== "banker" && nextRes !== "player") return null;
+
+  // 模拟下一步大路位置
+  const sim = simulateBigStep({
+    map: bigMap,
+    col: bigCol,
+    row: bigRow,
+    last: lastResult
+  }, nextRes);
+
+  const c = sim.col;
+  const r = sim.row;
+
+  return {
+    bigEye: calcBigEyeColor(c, r),
+    small:  calcSmallRoadColor(c, r),
+    cock:   calcCockroachColor(c, r)
+  };
+}
+
+function renderAskRoad() {
+  const b = askRoad("banker");
+  const p = askRoad("player");
+
+  // 重置所有問路格子
+  const resetCell = (el) => {
+    el.className = "askCell";
+    el.innerHTML = "";  // 務必清空文字
+  };
+
+  [askBankerEye, askBankerSmall, askBankerCock,
+   askPlayerEye, askPlayerSmall, askPlayerCock].forEach(resetCell);
+
+  // 莊家預測 - 對應三種路圖標
+  if (b) {
+    if (b.bigEye) {
+      askBankerEye.className += " hollow " + b.bigEye;  // 空心圓 + 顏色
+    }
+    if (b.small) {
+  setAskSmall(askBankerSmall, b.small);
+}
+
+    if (b.cock) {
+  askBankerCock.className += " cock " + b.cock;
+}
+
+  }
+
+  // 閒家預測 - 同上
+  if (p) {
+    if (p.bigEye) {
+      askPlayerEye.className += " hollow " + p.bigEye;
+    }
+    if (p.small) {
+  setAskSmall(askPlayerSmall, p.small);
+}
+
+    if (p.cock) {
+  askPlayerCock.className += " cock " + p.cock;
+}
+
+  }
+
+  // 可選：除錯用，確認有沒有計算出來
+  // console.log("問路更新 - 莊:", b, "  閒:", p);
+}
+
+function renderDerivedRoads() {
+  renderRoad(bigEyeRoad, bigEye, false, true);     // 大眼 → hollow + red/blue
+  renderRoad(smallRoadR, smallRoad, false, false); // 小路 → 實心 red/blue
+  renderRoad(cockroachRoadR, cockroachRoad, true, false); // 曱甴 → 斜杠 + 實心 red/blue
+}
+
+/* ===== 珠盘路（每局一个） ===== */
+function drawBead(res){
+  const d = document.createElement("div");
+  d.className = "cell " + res;
+  d.innerText = res[0].toUpperCase();
+  beadRoad.appendChild(d);
+}
+
+// 判断某列高度（有多少格）
+function colHeight(c){
+  return bigMap[c] ? Object.keys(bigMap[c]).length : 0;
+}
+
+// 判断某格是否存在
+function hasBig(c, r){
+  return !!bigMap[c]?.[r];
+}
+
+function calcBigEyeColor(c, r){
+  // 新列
+  if(r === 0){
+    if(c < 2) return null;
+    return colHeight(c-1) === colHeight(c-2) ? "red" : "blue";
+  }
+  // 同列向下
+  else{
+    if(c < 1) return null;
+    return hasBig(c-1, r) === hasBig(c-1, r-1)
+      ? "red"
+      : "blue";
+  }
+}
+
+
+function calcSmallRoadColor(c, r) {
+  // 放寬：從第 2 列開始就能計算（原本太嚴格）
+  if (c < 2) return null;
+
+  // 新列判斷
+  if (r === 0) {
+    // 至少要有前 3 列比較，但防負數索引
+    if (c < 3) return null;
+    const prev1 = colHeight(c - 1);
+    const prev3 = colHeight(Math.max(0, c - 3));
+    return prev1 === prev3 ? "red" : "blue";
+  }
+  // 同列向下
+  else {
+    // 比較左 2 列的該行與上一行是否存在
+    return hasBig(c - 2, r) === hasBig(c - 2, r - 1) ? "red" : "blue";
+  }
+}
+
+function calcCockroachColor(c, r){
+  // 新列（规则：C-1 vs C-4 列高度）
+  if(r === 0){
+    if(c < 4) return null;
+    return colHeight(c-1) === colHeight(c-4) ? "red" : "blue";
+  }
+  // 同列向下（规则：固定看左三列）
+  else{
+    if(c < 3) return null;
+    return hasBig(c-3, r) === hasBig(c-3, r-1)
+      ? "red"
+      : "blue";
+  }
+}
+
+
+let bankerAsk = askRoad("banker");
+let playerAsk = askRoad("player");
+
+/* ====== 回测 ====== */
+
+let s6FollowState = {
+  running: false,
+  waitingForBet: false,   // 是否等待下一局下注
+  totalBet: 0,
+  win: 0,
+  lose: 0,
+  tie: 0,
+
+   currentWinStreak: 0,
+  currentLoseStreak: 0,
+  maxWinStreak: 0,
+  maxLoseStreak: 0
+};
+
+function dealOncePure(deck){
+  let p=[deck.pop(),deck.pop()];
+  let b=[deck.pop(),deck.pop()];
+
+  let pp = point(p);
+  let bp = point(b);
+  let pThird = null;
+
+  if(pp <= 5){
+    pThird = deck.pop();
+    p.push(pThird);
+  }
+
+  if(pThird === null){
+    if(bp <= 5) b.push(deck.pop());
+  }else{
+    if(
+      bp <= 2 ||
+      (bp === 3 && pThird !== 8) ||
+      (bp === 4 && pThird >= 2 && pThird <= 7) ||
+      (bp === 5 && pThird >= 4 && pThird <= 7) ||
+      (bp === 6 && (pThird === 6 || pThird === 7))
+    ) b.push(deck.pop());
+  }
+
+  pp = point(p);
+  bp = point(b);
+
+  return {
+    res: pp > bp ? "player" : bp > pp ? "banker" : "tie",
+    bankerPoint: bp
+  };
+}
+
+function runSuper6FollowSimulation(rounds = 100000){
+  // 初始化
+  s6FollowState.running = true;
+  s6FollowState.waitingForBet = false;
+  s6FollowState.totalBet = 0;
+  s6FollowState.win = 0;
+  s6FollowState.lose = 0;
+  s6FollowState.tie = 0;
+
+  let deck = [];
+
+  for(let i=0; i<rounds; i++){
+    if(deck.length < 6){
+      deck = [];
+      let base=[1,2,3,4,5,6,7,8,9,0,0,0,0];
+      for(let d=0; d<8; d++) base.forEach(c=>deck.push(c));
+      deck.sort(()=>Math.random()-0.5);
+    }
+
+    let result = dealOncePure(deck);
+
+    // ===== 如果这是下注局 =====
+    // ===== 如果这是下注局 =====
+if(s6FollowState.waitingForBet){
+  s6FollowState.totalBet++;
+
+  if(result.res === "player"){
+    s6FollowState.win++;
+
+    // ✅ 连胜 / 连输统计
+    s6FollowState.currentWinStreak++;
+    s6FollowState.currentLoseStreak = 0;
+
+    s6FollowState.maxWinStreak = Math.max(
+      s6FollowState.maxWinStreak,
+      s6FollowState.currentWinStreak
+    );
+
+  }
+  else if(result.res === "banker"){
+    s6FollowState.lose++;
+
+    // ✅ 连胜 / 连输统计
+    s6FollowState.currentLoseStreak++;
+    s6FollowState.currentWinStreak = 0;
+
+    s6FollowState.maxLoseStreak = Math.max(
+      s6FollowState.maxLoseStreak,
+      s6FollowState.currentLoseStreak
+    );
+
+  }
+  else{ // tie
+    s6FollowState.tie++;
+
+    // 和局：断连
+    s6FollowState.currentWinStreak = 0;
+    s6FollowState.currentLoseStreak = 0;
+  }
+
+  s6FollowState.waitingForBet = false;
+}
+
+
+    // ===== 是否触发超级6 =====
+    if(result.res === "banker" && result.bankerPoint === 6){
+      s6FollowState.waitingForBet = true;
+    }
+  }
+
+  printSuper6FollowResult();
+}
+
+function printSuper6FollowResult(){
+  let effectiveTotal = s6FollowState.win + s6FollowState.lose;
+let rate = effectiveTotal === 0
+  ? 0
+  : ((s6FollowState.win / effectiveTotal) * 100).toFixed(2);
+
+
+
+
+  console.log("====== 超级6 → 押闲 回测结果 ======");
+console.log("总下注局数:", s6FollowState.totalBet);
+console.log("赢:", s6FollowState.win);
+console.log("输:", s6FollowState.lose);
+console.log("和:", s6FollowState.tie);
+console.log("胜率:", rate + "%");
+console.log("最高连胜:", s6FollowState.maxWinStreak);
+console.log("最多连输:", s6FollowState.maxLoseStreak);
+
+
+}
+
+function drawCard(){
+  if(dealtCount >= cutPosition){
+    alert("到切牌卡，换靴！");
+    resetRoads();
+    createShoe();
+  }
+
+  dealtCount++;
+  return shoe.pop();
+}
+
+function decideAutoBet(){
+  // 用“小路问路”作为信号（你也可以换 bigEye / cock）
+  const ask = askRoad("banker"); // 先假设庄
+
+  if(!ask || !ask.small) return null;
+
+  // 小路红 → 顺
+  if(ask.small === "red") return "banker";
+
+  // 小路蓝 → 反
+  if(ask.small === "blue") return "player";
+
+  return null;
+}
+
+/*回测方法*/
+
+function createMartingaleSizer(){
+  const seq = [100, 300, 600, 1200];
+  let idx = 0;
+
+  return {
+    next(){
+      return seq[idx];
+    },
+    win(){
+      idx = 0;
+    },
+    lose(){
+      if(idx < seq.length - 1) idx++;
+    },
+    reset(){
+      idx = 0;
+    }
+  };
+}
+
+function createFlatSizer(){
+  return {
+    next(){ return 100; },
+    win(){},
+    lose(){},
+    reset(){}
+  };
+}
+
+const whenStrategies = {
+  smallFollow(){
+    const ask = askRoad("banker");
+    if(!ask || !ask.small) return null;
+    return ask.small === "red" ? "banker" : "player";
+  },
+
+  bigEyeFollow(){
+    const ask = askRoad("banker");
+    if(!ask || !ask.bigEye) return null;
+    return ask.bigEye === "red" ? "banker" : "player";
+  },
+
+  reverse(){
+    const ask = askRoad("banker");
+    if(!ask || !ask.small) return null;
+    return ask.small === "red" ? "player" : "banker";
+  },
+
+  // ✅ 新增：庄≤6赢 → 反打闲
+  bankerLowReverse(){
+    if(!lastResult || lastBankerPoint == null) return null;
+
+    // 庄赢 且 庄点数 ≤ 6 → 下闲
+    if(lastResult === "banker" && lastBankerPoint <= 6){
+      return "player";
+    }
+
+    return null;
+  }
+
+};
+function setAskSmall(el, color) {
+  el.className = "askCell small"; // 重置类型
+  if(color === "red") el.classList.add("red");
+  else if(color === "blue") el.classList.add("blue");
+}
+
+function startBacktest(){
+  const whenKey = document.getElementById("btWhen").value;
+  const sizeKey = document.getElementById("btSizer").value;
+  const rounds  = Number(document.getElementById("btRounds").value);
+
+  const when = whenStrategies[whenKey];
+  const sizer = sizeKey === "martingale"
+    ? createMartingaleSizer()
+    : createFlatSizer();
+
+  // ===== 回测状态 =====
+  let bank = 10000;
+  let betCount = 0;
+  let win = 0;
+  let lose = 0;
+  let tie = 0;
+
+  resetRoads();
+  createDeck();   // 你已有的
+  sizer.reset();
+
+  for(let i=0;i<rounds;i++){
+    // 1️⃣ 决定是否下注
+    const side = when();
+    let betAmt = 0;
+
+    if(side){
+      betAmt = sizer.next();
+      betCount++;
+    }
+
+    // 2️⃣ 发一局（用你自己的）
+    const res = dealOnceSimWithDeck();
+
+    // 3️⃣ 画路（非常关键，给下一局用）
+    drawBigRoad(res);
+
+    // 4️⃣ 结算
+    if(side){
+      if(res === side){
+        bank += betAmt;
+        win++;
+        sizer.win();
+      }
+      else if(res === "tie"){
+        tie++;
+        sizer.reset(); // 你也可以选择不 reset
+      }
+      else{
+        bank -= betAmt;
+        lose++;
+        sizer.lose();
+      }
+    }
+  }
+
+  // ===== 输出结果 =====
+  console.log("====== 回测结果 ======");
+  console.log("总局数:", rounds);
+  console.log("下注局数:", betCount);
+  console.log("赢:", win);
+  console.log("输:", lose);
+  console.log("和:", tie);
+  console.log("胜率:", (win/(win+lose)*100).toFixed(2)+"%");
+  console.log("最终资金:", bank);
+}
+
+function decideBetByBankerPoint(lastResult, lastBankerPoint) {
+  // 庄赢 + 庄点数 ≤ 6 → 下一局下闲
+  if (lastResult === "banker" && lastBankerPoint <= 6) {
+    return "player";
+  }
+  return null; // 不下注
+}
+/* ====== 分路规律回测方法 ====== */
+const scoreState = {
+  banker: 0,   // 当前庄的下注积分 %
+  player: 0    // 当前闲的下注积分 %
+};
+
+/* =========================================================
+   四路规律积分回测（独立回测方法）
+   - 大路 / 大眼 / 小路 / 曱甴
+   - 每条路命中规律 → +25%
+   - 单局累计，局后清零
+   - ≥75% 才下注
+   ========================================================= */
+function startPatternScoreBacktest(){
+
+  const rounds = Number(document.getElementById("btRounds").value) || 10000;
+
+  // ===== 回测资金 & 统计 =====
+  let bank = 10000;
+  let betCount = 0;
+  let win = 0;
+  let lose = 0;
+  let tie = 0;
+
+  // ===== 每一局用的积分 =====
+  let score = {
+    banker: 0,
+    player: 0
+  };
+
+  // ===== 重置路盘 =====
+  resetRoads();
+  createDeck();
+
+  /* ========= 工具函数 ========= */
+
+  // 从 road.map 中取最近 N 个结果（banker / player）
+  function getLastResultsFromRoad(roadMap, n = 10){
+    let arr = [];
+    Object.keys(roadMap)
+      .map(Number)
+      .sort((a,b)=>a-b)
+      .forEach(c=>{
+        Object.keys(roadMap[c])
+          .map(Number)
+          .sort((a,b)=>a-b)
+          .forEach(r=>{
+            if(roadMap[c][r].res){
+              arr.push(roadMap[c][r].res);
+            }
+          });
+      });
+    return arr.slice(-n);
+  }
+
+  // 判断是否存在“规律”，并给出预测方向
+  function detectPattern(seq){
+    if(seq.length < 6) return null;
+
+    // 1️⃣ 全同
+    if(seq.every(v=>v===seq[0])){
+      return seq[0];
+    }
+
+    // 2️⃣ 庄闲交替
+    let alt = true;
+    for(let i=2;i<seq.length;i++){
+      if(seq[i] !== seq[i-2]){
+        alt = false;
+        break;
+      }
+    }
+    if(alt){
+      return seq[seq.length-2]; // 预测继续交替
+    }
+
+    // 3️⃣ 成对（庄庄闲闲）
+    let pair = true;
+    for(let i=0;i<seq.length;i+=2){
+      if(seq[i] !== seq[i+1]){
+        pair = false;
+        break;
+      }
+    }
+    if(pair){
+      return seq[seq.length-1];
+    }
+
+    // 4️⃣ 最近 6 手同向
+    let last6 = seq.slice(-6);
+    if(last6.every(v=>v===last6[0])){
+      return last6[0];
+    }
+
+    return null;
+  }
+
+  // 给积分
+  function addScore(side){
+    if(!side) return;
+    score[side] += 25;
+  }
+
+  // 判断是否触发下注
+  function shouldBet(){
+    if(score.banker >= 75) return "banker";
+    if(score.player >= 75) return "player";
+    return null;
+  }
+
+  // 清零积分（你要求的关键规则）
+  function resetScore(){
+    score.banker = 0;
+    score.player = 0;
+  }
+
+  /* ========= 回测主循环 ========= */
+  for(let i=0;i<rounds;i++){
+
+    resetScore();
+
+    // ===== 从四条路分别取最近 10 手 =====
+    const bigSeq   = getLastResultsFromRoad(bigMap);
+    const eyeSeq   = bigEyeRoad.map ? [] : []; // 兼容
+    const smallSeq = smallRoadR.map ? [] : [];
+    const cockSeq  = cockroachRoadR.map ? [] : [];
+
+    // 大路
+    addScore(detectPattern(bigSeq));
+
+    // 大眼
+    if(bigEyeRoad.last){
+      addScore(bigEyeRoad.last === "red" ? "banker" : "player");
+    }
+
+    // 小路
+    if(smallRoadR.last){
+      addScore(smallRoadR.last === "red" ? "banker" : "player");
+    }
+
+    // 曱甴
+    if(cockroachRoadR.last){
+      addScore(cockroachRoadR.last === "red" ? "banker" : "player");
+    }
+
+    // ===== 判断是否下注 =====
+    const betSide = shouldBet();
+    let betAmt = 0;
+
+    if(betSide){
+      betAmt = 1000 * (score[betSide] / 100);
+      betCount++;
+    }
+
+    // ===== 发牌 =====
+    const res = dealOnceSimWithDeck();
+
+    // ===== 画路（给下一局用）=====
+    drawBigRoad(res);
+
+    // ===== 结算 =====
+    if(betSide){
+      if(res === betSide){
+        bank += betAmt;
+        win++;
+      }
+      else if(res === "tie"){
+        tie++;
+      }
+      else{
+        bank -= betAmt;
+        lose++;
+      }
+    }
+  }
+
+  // ===== 输出结果 =====
+  const effective = win + lose;
+  const rate = effective === 0 ? 0 : ((win / effective) * 100).toFixed(2);
+
+  console.log("====== 四路规律积分回测 ======");
+  console.log("总局数:", rounds);
+  console.log("下注局数:", betCount);
+  console.log("赢:", win);
+  console.log("输:", lose);
+  console.log("和:", tie);
+  console.log("胜率:", rate + "%");
+  console.log("最终资金:", bank);
+}
+
+//手机实盘操作
+function inputLive(res){
+  if(mode !== "live") return;
+
+  // 1️⃣ 只画路，不发牌
+  drawBigRoad(res);
+  drawBead(res);
+
+  // 2️⃣ 立即用策略算下一手
+  const decision = decideLiveBet();
+
+  // 3️⃣ 显示建议
+  showLiveAdvice(decision);
+}
+
+function decideLiveBet(){
+  const whenKey = document.getElementById("btWhen").value;
+  const when = whenStrategies[whenKey];
+
+  return when ? when() : null;
+}
+
+function showLiveAdvice(side){
+  if(!side){
+    resultText.innerText = "⏸ 建议：不下注";
+    return;
+  }
+
+  resultText.innerText =
+    side === "banker"
+      ? "🔥 建议：下一局下【庄】"
+      : "🔥 建议：下一局下【闲】";
+}
+
+let mode = "sim"; // sim | live
+
+function enterLiveMode(){
+  mode = "live";
+  document.getElementById("livePanel").style.display = "flex";
+  resetRoads();
+  document.getElementById("liveAdvice").innerText = "等待输入…";
+}
+
+function inputLive(res){
+  if(mode !== "live") return;
+
+  // 只画路，不结算、不发牌
+  drawBigRoad(res);
+  drawBead(res);
+
+  // 用你已有策略算下一局
+  const side = decideLiveBet();
+
+  // 显示建议
+  showLiveAdvice(side);
+}
+
+function decideLiveBet(){
+  const whenKey = document.getElementById("btWhen").value;
+  const when = whenStrategies[whenKey];
+  return when ? when() : null;
+}
+
+function showLiveAdvice(side){
+  const el = document.getElementById("liveAdvice");
+
+  if(!side){
+    el.innerText = "⏸ 不下注";
+    el.style.color = "#aaa";
+    return;
+  }
+
+  if(side === "banker"){
+    el.innerText = "🔥 下庄";
+    el.style.color = "#ff4d4d";
+  }else{
+    el.innerText = "🔥 下闲";
+    el.style.color = "#1e90ff";
+  }
+}
+
+function resetLiveMode(){
+  resetRoads();
+  document.getElementById("liveAdvice").innerText = "等待输入…";
+}
+
+function enterLiveMode(){
+  mode = "live";
+
+  document.getElementById("livePanel").style.display = "flex";
+
+  // 清空主界面路，避免污染
+  resetRoads();
+
+  // 同步路容器
+  syncLiveRoadContainers();
+}
+
+function exitLiveMode(){
+  mode = "sim";
+  document.getElementById("livePanel").style.display = "none";
+}
+
+function syncLiveRoadContainers(){
+  // 让 renderRoad 画到实盘容器
+  bigRoad = document.getElementById("liveBigRoad");
+  bigEye = document.getElementById("liveBigEye");
+  smallRoad = document.getElementById("liveSmallRoad");
+  cockroachRoad = document.getElementById("liveCockroachRoad");
+}
+
+function inputLive(res){
+  if(mode !== "live") return;
+
+  drawBigRoad(res);   // ✅ 大路立刻画
+  drawBead(res);
+
+  const side = decideLiveBet();
+  showLiveAdvice(side);
+}
+
+function resetLiveMode(){
+  resetRoads();
+  document.getElementById("liveAdvice").innerText = "等待输入…";
+}
+
+/* ====== 初始化 ====== */
+createShoe();     // ✅ 一定要先
+createDeck();     // （模拟 / 回测用）
+balanceSpan();
+updateBetStats();
+
+/*查看切牌位置语句***重要！不能删！
+console.log("Shoe 进度:", getShoeProgress());*/
+
+</script>
+
+</body>
+</html>
