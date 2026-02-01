@@ -388,7 +388,6 @@
   background: transparent !important;
   border-radius: 50% !important;
 }
-
 /* =========================
    📱 实盘模式 · 手机 UI
    ========================= */
@@ -409,6 +408,8 @@
 .live-road-area{
   padding: 10px;
   border-bottom: 1px solid #333;
+  flex: 1; /* 允许路图区扩展 */
+  overflow-y: auto; /* 防止路图过长溢出 */
 }
 
 .live-road-area .road{
@@ -489,8 +490,192 @@
   background:#333;
   color:white;
 }
-order: none;
+
+
+/* 新增：手机适配优化 - 通用 */
+/* 确保全屏适配不同手机（如iPhone的刘海屏、安全区域） */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .live-panel {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
 }
+
+/* 手机小屏优化（宽度 < 400px，如旧iPhone） */
+@media (max-width: 400px) {
+  .live-road-area {
+    padding: 5px;
+  }
+
+  .live-btn {
+    height: 70px;
+    font-size: 24px;
+  }
+
+  .live-btn.tie {
+    height: 60px;
+  }
+
+  .live-advice {
+    height: 60px;
+    font-size: 20px;
+  }
+
+  .live-footer button {
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .cell {
+    width: 20px;
+    height: 20px;
+    margin: 2px;
+    font-size: 10px;
+    line-height: 20px;
+  }
+
+  .askCell {
+    width: 28px;
+    height: 28px;
+    margin: 0 4px;
+  }
+}
+
+/* 竖屏模式（portrait） - 默认是column，优化路图高度 */
+@media (orientation: portrait) {
+  .live-road-area {
+    flex: 2; /* 在竖屏下给路图更多空间 */
+    min-height: 40vh;
+  }
+
+  .live-input-area {
+    flex: 1;
+  }
+
+  .live-btn-group {
+    grid-template-columns: repeat(2, 1fr); /* 保持双列 */
+  }
+
+  .road-sub {
+    grid-template-columns: repeat(3, 1fr); /* 子路保持三列 */
+  }
+}
+
+/* 横屏模式（landscape） - 调整为行布局以利用宽度 */
+@media (orientation: landscape) {
+  .live-panel {
+    flex-direction: row; /* 横屏时改为左右布局 */
+    align-items: stretch;
+  }
+
+  .live-road-area {
+    flex: 1 1 60%; /* 路图占左侧60% */
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px;
+    border-right: 1px solid #333; /* 改为右边框 */
+    border-bottom: none;
+  }
+
+  .live-input-area {
+    flex: 1 1 40%; /* 输入区占右侧40% */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .live-btn-group {
+    grid-template-columns: 1fr; /* 横屏下按钮单列，垂直排列 */
+    gap: 8px;
+  }
+
+  .live-btn {
+    height: 60px;
+    font-size: 28px;
+  }
+
+  .live-btn.tie {
+    grid-column: span 1; /* 取消span */
+    height: 60px;
+  }
+
+  .live-advice-area {
+    padding: 10px;
+  }
+
+  .live-advice {
+    height: 50px;
+    font-size: 22px;
+  }
+
+  .live-footer {
+    flex-direction: column; /* 底部按钮垂直 */
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .live-footer button {
+    height: 40px;
+  }
+
+  /* 路图在横屏下调整网格 */
+  .road-sub {
+    grid-template-columns: repeat(1, 1fr); /* 子路单列垂直 */
+    gap: 10px;
+  }
+
+  .road {
+    min-height: 100px; /* 横屏下路图高度减小 */
+  }
+}
+
+/* =========================
+   📱 实盘模式 · 路图缩放
+   ========================= */
+
+/* 实盘模式下：整体字号 & 间距更紧凑 */
+#livePanel {
+  font-size: 12px;
+}
+
+/* ===== 大路：保持清晰 ===== */
+#liveBigRoad .cell {
+  width: 22px;
+  height: 22px;
+  margin: 2px;
+  font-size: 11px;
+  line-height: 22px;
+}
+
+/* ===== 派生路：整体缩小 ===== */
+#liveBigEye,
+#liveSmallRoad,
+#liveCockroachRoad {
+  transform: scale(0.7);            /* 🔥 核心 */
+  transform-origin: top left;       /* 从左上缩 */
+}
+
+/* 防止缩放后被裁切 */
+#liveBigEye,
+#liveSmallRoad,
+#liveCockroachRoad {
+  overflow: visible;
+}
+
+/* 派生路容器整体高度压缩 */
+.road-sub > div {
+  min-height: 80px;
+}
+
+/* 派生路标题也小一点 */
+.road-sub .road-title {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
 
 </style>
 </head>
@@ -934,7 +1119,7 @@ function createShoe(){
     0,0,0,0,
     1,2,3,4,5,6,7,8,9,
     0,0,0,0,  
-     // 共 5230006
+     // 共 52
   ];
 
   for(let i = 0; i < 8; i++){
@@ -1549,6 +1734,7 @@ function autoStep(){
   if(!autoBetState.running) return;
 
   // 到切牌卡 → 换靴 & 清空路
+  
   
 
   // ===== 1️⃣ 决定是否下注 =====
@@ -2339,20 +2525,7 @@ function startPatternScoreBacktest(){
   console.log("最终资金:", bank);
 }
 
-//手机实盘操作
-function inputLive(res){
-  if(mode !== "live") return;
 
-  // 1️⃣ 只画路，不发牌
-  drawBigRoad(res);
-  drawBead(res);
-
-  // 2️⃣ 立即用策略算下一手
-  const decision = decideLiveBet();
-
-  // 3️⃣ 显示建议
-  showLiveAdvice(decision);
-}
 
 function decideLiveBet(){
   const whenKey = document.getElementById("btWhen").value;
@@ -2375,26 +2548,33 @@ function showLiveAdvice(side){
 
 let mode = "sim"; // sim | live
 
-function enterLiveMode(){
+function enterLiveMode() {
   mode = "live";
   document.getElementById("livePanel").style.display = "flex";
-  resetRoads();
-  document.getElementById("liveAdvice").innerText = "等待输入…";
+  
+  // 清空所有路圖（避免舊資料干擾）
+  resetRoads();  // 你已經有這個函數了
+  
+  // 顯示提示
+  document.getElementById("liveAdvice").innerText = "請輸入上一局結果開始記錄路盤";
+  
+  // 可選：如果想帶入之前的路盤，可以這裡呼叫 render 一次
+  // 但大多數人進入實盤模式都希望從頭開始，所以直接清空即可
 }
 
-function inputLive(res){
-  if(mode !== "live") return;
+function inputLive(res) {
+  if (mode !== "live") return;
 
-  // 只画路，不结算、不发牌
-  drawBigRoad(res);
   drawBead(res);
+  drawBigRoad(res);
+  renderAskRoad();
 
-  // 用你已有策略算下一局
+  syncLiveRoadContainers();   // ⭐⭐⭐ 关键补充
+
   const side = decideLiveBet();
-
-  // 显示建议
   showLiveAdvice(side);
 }
+
 
 function decideLiveBet(){
   const whenKey = document.getElementById("btWhen").value;
@@ -2425,17 +2605,6 @@ function resetLiveMode(){
   document.getElementById("liveAdvice").innerText = "等待输入…";
 }
 
-function enterLiveMode(){
-  mode = "live";
-
-  document.getElementById("livePanel").style.display = "flex";
-
-  // 清空主界面路，避免污染
-  resetRoads();
-
-  // 同步路容器
-  syncLiveRoadContainers();
-}
 
 function exitLiveMode(){
   mode = "sim";
@@ -2443,27 +2612,19 @@ function exitLiveMode(){
 }
 
 function syncLiveRoadContainers(){
-  // 让 renderRoad 画到实盘容器
-  bigRoad = document.getElementById("liveBigRoad");
-  bigEye = document.getElementById("liveBigEye");
-  smallRoad = document.getElementById("liveSmallRoad");
-  cockroachRoad = document.getElementById("liveCockroachRoad");
+  document.getElementById("liveBigRoad").innerHTML =
+    document.getElementById("bigRoad").innerHTML;
+
+  document.getElementById("liveBigEye").innerHTML =
+    document.getElementById("bigEye").innerHTML;
+
+  document.getElementById("liveSmallRoad").innerHTML =
+    document.getElementById("smallRoad").innerHTML;
+
+  document.getElementById("liveCockroachRoad").innerHTML =
+    document.getElementById("cockroachRoad").innerHTML;
 }
 
-function inputLive(res){
-  if(mode !== "live") return;
-
-  drawBigRoad(res);   // ✅ 大路立刻画
-  drawBead(res);
-
-  const side = decideLiveBet();
-  showLiveAdvice(side);
-}
-
-function resetLiveMode(){
-  resetRoads();
-  document.getElementById("liveAdvice").innerText = "等待输入…";
-}
 
 /* ====== 初始化 ====== */
 createShoe();     // ✅ 一定要先
