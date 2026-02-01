@@ -637,44 +637,80 @@
    ========================= */
 
 /* 实盘模式下：整体字号 & 间距更紧凑 */
+/* =========================
+   📱 实盘模式 · 极限压缩版
+   ========================= */
+
+/* ===== 整个实盘面板缩紧 ===== */
 #livePanel {
-  font-size: 12px;
-}
-
-/* ===== 大路：保持清晰 ===== */
-#liveBigRoad .cell {
-  width: 22px;
-  height: 22px;
-  margin: 2px;
   font-size: 11px;
-  line-height: 22px;
 }
 
-/* ===== 派生路：整体缩小 ===== */
-#liveBigEye,
-#liveSmallRoad,
-#liveCockroachRoad {
-  transform: scale(0.7);            /* 🔥 核心 */
-  transform-origin: top left;       /* 从左上缩 */
-}
-
-/* 防止缩放后被裁切 */
-#liveBigEye,
-#liveSmallRoad,
-#liveCockroachRoad {
+/* =========================
+   ① 大路：缩小到 70%
+   ========================= */
+#liveBigRoad {
+  transform: scale(0.5);
+  transform-origin: top left;
   overflow: visible;
 }
 
-/* 派生路容器整体高度压缩 */
-.road-sub > div {
-  min-height: 80px;
+/* 大路格子进一步压缩 */
+#liveBigRoad .cell {
+  width: 18px;
+  height: 18px;
+  margin: 2px;
+  font-size: 9px;
+  line-height: 18px;
 }
 
-/* 派生路标题也小一点 */
-.road-sub .road-title {
-  font-size: 11px;
-  margin-bottom: 4px;
+/* =========================
+   ② 派生路：= 大路的 1/4
+   → 0.7 × 0.25 = 0.175
+   ========================= */
+#liveBigEye,
+#liveSmallRoad,
+#liveCockroachRoad {
+  transform: scale(0.175);
+  transform-origin: top left;
+  overflow: visible;
 }
+
+/* 派生路容器高度强制压扁 */
+.road-sub > div {
+  height: 60px;
+  overflow: hidden;
+}
+
+/* 派生路标题极小化 */
+.road-sub .road-title {
+  font-size: 9px;
+  margin-bottom: 2px;
+  opacity: 0.75;
+}
+
+/* =========================
+   ③ 派生路格子（防止变形）
+   ========================= */
+#liveBigEye .cell,
+#liveSmallRoad .cell,
+#liveCockroachRoad .cell {
+  width: 18px;
+  height: 18px;
+  margin: 1px;
+}
+
+/* =========================
+   ④ 竖屏专用：全部塞进一屏
+   ========================= */
+@media (orientation: portrait) {
+  .live-road-area {
+    flex: none;
+    max-height: 45vh;   /* 🔥 路图区最多占 45% 屏幕 */
+    overflow: hidden;
+  }
+}
+
 
 
 </style>
