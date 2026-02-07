@@ -711,6 +711,48 @@
   }
 }
 
+/* 只放大實盤模式的「下一局建議」區域，讓它佔約41.4%畫面高度 */
+@media (orientation: portrait) 
+   and (min-height: 2600px) {
+  
+  /* 建議區域整體放大 + 佔比 */
+  .live-advice-area {
+    flex: 0 0 41.4%;          /* 直接佔畫面高度約41.4% */
+    padding: 0;
+    margin: 0;
+    background: transparent;   /* 讓背景融入主面板 */
+  }
+
+  /* 核心建議文字：超大、超顯眼 */
+  .live-advice {
+    height: 100%;             /* 填滿整個區域 */
+    font-size: 68px;          /* 字體極大，適合大螢幕 */
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: 3px;
+    text-shadow: 0 6px 20px rgba(0,0,0,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    border-radius: 0;
+    border: none;
+    background: #111;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+    color: #ffd700;           /* 金色更醒目 */
+  }
+
+  /* 當有明確建議時加動畫強調 */
+  .live-advice:not(:contains("等待")):not(:contains("自行")) {
+    background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+    animation: glow 1.8s infinite alternate;
+  }
+
+  @keyframes glow {
+    from { box-shadow: inset 0 0 20px #ffd70080; }
+    to   { box-shadow: inset 0 0 60px #ffd700cc; }
+  }
+}
 
 
 </style>
@@ -939,6 +981,7 @@
       <button class="live-btn banker" onclick="inputLive('banker')">庄</button>
       <button class="live-btn player" onclick="inputLive('player')">闲</button>
       <button class="live-btn tie" onclick="inputLive('tie')">和</button>
+      <button onclick="restoreLiveSnapshot()">↩ 回退一局</button>
     </div>
 
   </div>
@@ -959,6 +1002,10 @@
 
 <!-- 你的原始 JavaScript 完整保留，不做任何刪減 -->
 <script>
+// ===== 实盘 · 回退历史 =====
+let liveHistory = [];
+
+
 const liveAskCells = {
   bEye:   document.getElementById("live-ask-b-eye"),
   bSmall: document.getElementById("live-ask-b-small"),
@@ -1916,6 +1963,54 @@ function resetRoads(){
   renderDerivedRoads();
 }
 
+function saveLiveSnapshot(){
+  liveHistory.push({
+    bigMap: JSON.parse(JSON.stringify(bigMap)),
+    bigCol,
+    bigRow,
+    lastResult,
+
+    bigEyeRoad: JSON.parse(JSON.stringify(bigEyeRoad)),
+    smallRoadR: JSON.parse(JSON.stringify(smallRoadR)),
+    cockroachRoadR: JSON.parse(JSON.stringify(cockroachRoadR)),
+
+    beadHTML: beadRoad.innerHTML,
+
+    liveScore: JSON.parse(JSON.stringify(liveScore))
+  });
+}
+
+function restoreLiveSnapshot(){
+  if(liveHistory.length === 0){
+    alert("已经是最早一局，无法回退");
+    return;
+  }
+
+  const s = liveHistory.pop();
+
+  bigMap = s.bigMap;
+  bigCol = s.bigCol;
+  bigRow = s.bigRow;
+  lastResult = s.lastResult;
+
+  bigEyeRoad = s.bigEyeRoad;
+  smallRoadR = s.smallRoadR;
+  cockroachRoadR = s.cockroachRoadR;
+
+  beadRoad.innerHTML = s.beadHTML;
+  liveScore = s.liveScore;
+
+  // 🔁 重新渲染
+  renderBigRoad();
+  renderDerivedRoads();
+  renderAskRoad();
+  renderLiveAsk();
+  syncLiveRoadContainers();
+
+  showLiveAdvice(decideLiveBet());
+}
+
+
 
 function simulateBigStep(state, res){
   let { map, col, row, last } = JSON.parse(JSON.stringify(state));
@@ -2245,6 +2340,8 @@ function drawCard(){
   dealtCount++;
   return shoe.pop();
 }
+
+
 
 function decideAutoBet(){
   // 用“小路问路”作为信号（你也可以换 bigEye / cock）
@@ -3188,6 +3285,8 @@ function renderLiveAsk() {
 // ───────────────────────────────────────────────
 function inputLive(res) {
   if (mode !== "live") return;
+
+  saveLiveSnapshot();  
  resetLiveScore(); 
   // 1. 記錄這一局結果 → 更新所有路圖
   drawBead(res);
